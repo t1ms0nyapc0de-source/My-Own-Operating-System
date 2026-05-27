@@ -64,6 +64,14 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y) {
 }
 
 void terminal_putchar(char c) {
+	if (c == '\n') {
+		terminal_column = 0;
+		if (++terminal_row == VGA_HEIGHT) {
+			terminal_row = 0;
+		}
+		return;
+	}
+
 	terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
 	if (++terminal_column == VGA_WIDTH) {
 		terminal_column = 0;
@@ -78,4 +86,13 @@ void terminal_writestring(const char* data) {
 		terminal_putchar(data[i]);
 		i++;
 	}
+}
+
+void kernel_main(void) {
+	/* Initialize terminal interface */
+	terminal_initialize();
+	
+	/* Print a welcome message */
+	terminal_writestring("Hello, Kernel World!\n");
+	terminal_writestring("This is a custom x86 kernel booting successfully.\n");
 }
