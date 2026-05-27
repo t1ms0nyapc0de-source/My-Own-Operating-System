@@ -1,6 +1,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "gdt.h"
+#include "idt.h"
+#include "syscall.h"
+#include "user_mode.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -86,11 +90,33 @@ void terminal_writestring(const char *data) {
   }
 }
 
-void kernel_main(void) {
+void kernel_main(uint32_t magic, uint32_t mbi_addr) {
+  (void)magic;
+  (void)mbi_addr;
+
   /* Initialize terminal interface */
   terminal_initialize();
 
-  /* Print a welcome message */
-  terminal_writestring("Hello, Kernel World!\n");
-  terminal_writestring("This is a custom x86 kernel booting successfully.\n");
+  terminal_writestring("[Kernel] Initializing core systems...\n");
+
+  /* Initialize GDT & TSS */
+  gdt_init();
+  terminal_writestring("[Kernel] GDT and TSS successfully initialized.\n");
+
+  /* Initialize IDT */
+  idt_init();
+  terminal_writestring("[Kernel] IDT and ISR exception handlers registered.\n");
+
+  /* Initialize System Calls */
+  syscall_init();
+  terminal_writestring("[Kernel] System Call interface registered.\n");
+
+  /* Transition to Ring 3 User Mode */
+  terminal_writestring("[Kernel] Transitioning to Ring 3 User Mode...\n\n");
+  run_user_demo();
+
+  /* Should never reach here */
+  for (;;) {
+    asm volatile("hlt");
+  }
 }

@@ -24,6 +24,11 @@ section .text
 global _start:function (_start.end - _start)
 _start:
     mov esp, stack_top
+    
+    ; Push Multiboot arguments for kernel_main(magic, mbi_addr)
+    push ebx ; second argument: Multiboot info structure pointer
+    push eax ; first argument: Multiboot magic number
+    
     extern kernel_main
     call kernel_main
     cli

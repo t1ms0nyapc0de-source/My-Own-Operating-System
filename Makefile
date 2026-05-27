@@ -2,19 +2,32 @@ CC = i686-elf-gcc
 AS = nasm
 LD = i686-elf-gcc
 
-CFLAGS = -std=gnu99 -ffreestanding -O2 -Wall -Wextra
+CFLAGS = -std=gnu99 -ffreestanding -O2 -Wall -Wextra -Isrc
 LDFLAGS = -ffreestanding -O2 -nostdlib
+
+OBJS = src/boot.o \
+       src/gdt_flush.o \
+       src/isr.o \
+       src/user_switch.o \
+       src/string.o \
+       src/gdt.o \
+       src/idt.o \
+       src/syscall.o \
+       src/user_mode.o \
+       src/kernel.o
 
 all: myos.iso
 
-src/boot.o: src/boot.s
-	$(AS) -f elf32 src/boot.s -o src/boot.o
+# Assembly pattern rule
+%.o: %.s
+	$(AS) -f elf32 $< -o $@
 
-src/kernel.o: src/kernel.c
-	$(CC) -c src/kernel.c -o src/kernel.o $(CFLAGS)
+# C compilation pattern rule
+%.o: %.c
+	$(CC) -c $< -o $@ $(CFLAGS)
 
-myos.bin: src/boot.o src/kernel.o
-	$(LD) -T src/linker.ld -o myos.bin $(LDFLAGS) -lgcc src/boot.o src/kernel.o
+myos.bin: $(OBJS)
+	$(LD) -T src/linker.ld -o myos.bin $(LDFLAGS) -lgcc $(OBJS)
 
 myos.iso: myos.bin
 	mkdir -p isodir/boot/grub
@@ -22,7 +35,7 @@ myos.iso: myos.bin
 	cp grub.cfg isodir/boot/grub/grub.cfg
 	grub-mkrescue -o myos.iso isodir
 
-run:
+run: myos.iso
 	qemu-system-i386 -cdrom myos.iso
 
 clean:
