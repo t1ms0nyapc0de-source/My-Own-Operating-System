@@ -73,12 +73,20 @@ static void user_program(void) {
      */
     const char *msg1 = "[User] Hello from Ring 3 (User Mode)!\n";
     const char *msg2 = "[User] Calling sys_write via INT 0x80...\n";
-    const char *msg3 = "[User] Calling sys_exit. Goodbye!\n";
+    const char *msg3 = "[User] Attempting to write to Supervisor-protected page at 0xD0000000...\n";
 
     syscall_write(msg1, user_strlen(msg1));
     syscall_write(msg2, user_strlen(msg2));
     syscall_write(msg3, user_strlen(msg3));
 
+    /* 
+     * This write should trigger an immediate Page Fault exception
+     * since 0xD0000000 is mapped as Supervisor-only (flags = 0x3)
+     */
+    volatile uint32_t *ptr = (volatile uint32_t *)0xD0000000;
+    *ptr = 0xBAD1DEA;
+
+    /* Should never reach here due to the page fault panic */
     syscall_exit(0);
 
     /* Should never reach here — sys_exit halts the CPU */

@@ -15,6 +15,7 @@ OBJS = src/boot.o \
        src/syscall.o \
        src/user_mode.o \
        src/pmm.o \
+       src/vmm.o \
        src/kernel.o
 
 all: myos.iso

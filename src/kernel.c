@@ -6,6 +6,7 @@
 #include "syscall.h"
 #include "user_mode.h"
 #include "pmm.h"
+#include "vmm.h"
 #include "multiboot.h"
 
 /* Hardware text mode color constants. */
@@ -217,7 +218,72 @@ void kernel_main(uint32_t magic, uint32_t mbi_addr) {
 
   terminal_writestring("[Kernel] PMM diagnostic tests passed successfully!\n\n");
 
-  /* 7. Transition to Ring 3 User Mode */
+  /* 7. Initialize Virtual Memory Manager (VMM) */
+  terminal_writestring("[Kernel] Initializing Virtual Memory Manager (VMM)...\n");
+  vmm_init();
+
+  /* 8. Run VMM Diagnostic Test Suite */
+  terminal_writestring("[Kernel] Running VMM diagnostic tests...\n");
+
+  /* Test A: Dynamic Mapping & Write/Read Verification */
+  terminal_writestring("  -> Test A: Dynamic Mapping & Write Verification...\n");
+  void *phys_test = pmm_alloc_block();
+  if (!phys_test) {
+    terminal_writestring("  [VMM TEST FAILED] PMM allocation returned NULL!\n");
+    for (;;) { asm volatile("hlt"); }
+  }
+
+  /* Map 0xA0000000 to the physical block (Present | Write | User) */
+  vmm_map_page(phys_test, (void *)0xA0000000, VMM_FLAG_PRESENT | VMM_FLAG_WRITE | VMM_FLAG_USER);
+  
+  /* Write a verification signature */
+  volatile uint32_t *test_ptr = (volatile uint32_t *)0xA0000000;
+  *test_ptr = 0xCAFEBABE;
+
+  /* Read and verify signature */
+  if (*test_ptr != 0xCAFEBABE) {
+    terminal_writestring("  [VMM TEST FAILED] Read/write verification signature mismatch!\n");
+    for (;;) { asm volatile("hlt"); }
+  }
+  terminal_writestring("  -> Test A Passed: Virtual page successfully mapped, written, and verified.\n");
+
+  /* Clean up Test A */
+  vmm_unmap_page((void *)0xA0000000);
+  pmm_free_block(phys_test);
+
+  /* Test B: Demand Paging Verification */
+  terminal_writestring("  -> Test B: Demand Paging Verification...\n");
+  terminal_writestring("     (Writing to unmapped 0xC0000000 to trigger demand allocation)\n");
+  
+  /* 
+   * This write will trigger a Page Fault. The handler will intercept it,
+   * map it dynamically, and return here to re-execute the write!
+   */
+  volatile uint32_t *demand_ptr = (volatile uint32_t *)0xC0000000;
+  *demand_ptr = 0x12345678;
+
+  /* Verify the written value */
+  if (*demand_ptr != 0x12345678) {
+    terminal_writestring("  [VMM TEST FAILED] Demand paging value mismatch!\n");
+    for (;;) { asm volatile("hlt"); }
+  }
+  terminal_writestring("  -> Test B Passed: Demand paging dynamically resolved non-present access.\n");
+
+  /* Clean up Test B */
+  vmm_unmap_page((void *)0xC0000000);
+
+  terminal_writestring("[Kernel] VMM diagnostic tests passed successfully!\n\n");
+
+  /* 9. Prepare Supervisor Protection Security Test */
+  /* Map 0xD0000000 as Supervisor-only (NO User flag: VMM_FLAG_PRESENT | VMM_FLAG_WRITE) */
+  void *phys_sec = pmm_alloc_block();
+  if (!phys_sec) {
+    terminal_writestring("  [Kernel] Error: Failed to allocate physical frame for security test.\n");
+    for (;;) { asm volatile("hlt"); }
+  }
+  vmm_map_page(phys_sec, (void *)0xD0000000, VMM_FLAG_PRESENT | VMM_FLAG_WRITE);
+
+  /* 10. Transition to Ring 3 User Mode */
   terminal_writestring("[Kernel] Transitioning to Ring 3 User Mode...\n\n");
   run_user_demo();
 
