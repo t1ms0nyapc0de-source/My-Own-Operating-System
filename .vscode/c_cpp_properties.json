@@ -1,0 +1,15 @@
+{
+    "configurations": [
+        {
+            "name": "Kernel-GCC",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/src"
+            ],
+            "defines": [],
+            "cStandard": "gnu99",
+            "intelliSenseMode": "windows-gcc-x86"
+        }
+    ],
+    "version": 4
+}

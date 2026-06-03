@@ -122,3 +122,59 @@ ISR_NOERR 31
 ; ------- INT 0x80 — System Call Gate -------
 ; DPL=3 on the IDT entry lets Ring-3 code trigger this.
 ISR_NOERR 128
+
+; ------- Hardware Interrupts (IRQs 0-15) -------
+extern irq_dispatch
+
+irq_common_stub:
+    pusha                   ; Push edi,esi,ebp,esp,ebx,edx,ecx,eax
+
+    mov  ax, ds
+    push eax                ; Save data segment
+
+    ; Switch to kernel data segment
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    push esp                ; Pass registers struct pointer
+    call irq_dispatch
+    add  esp, 4             ; Clean argument from stack
+
+    pop  eax                ; Restore data segment
+    mov  ds, ax
+    mov  es, ax
+    mov  fs, ax
+    mov  gs, ax
+
+    popa                    ; Restore general registers
+    add  esp, 8             ; Discard dummy error code and interrupt number
+    iret                    ; Return and re-enable interrupts
+
+%macro IRQ 2
+global irq%1
+irq%1:
+    cli
+    push dword 0    ; dummy error code
+    push dword %2   ; interrupt vector (32 + %1)
+    jmp  irq_common_stub
+%endmacro
+
+IRQ  0, 32
+IRQ  1, 33
+IRQ  2, 34
+IRQ  3, 35
+IRQ  4, 36
+IRQ  5, 37
+IRQ  6, 38
+IRQ  7, 39
+IRQ  8, 40
+IRQ  9, 41
+IRQ  10, 42
+IRQ  11, 43
+IRQ  12, 44
+IRQ  13, 45
+IRQ  14, 46
+IRQ  15, 47

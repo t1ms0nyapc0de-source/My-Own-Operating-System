@@ -1,4 +1,5 @@
 #include "idt.h"
+#include "ports.h"
 #include <string.h>
 
 extern void idt_flush(uint32_t idt_ptr_addr);
@@ -97,6 +98,24 @@ void idt_init(void) {
      */
     idt_set_gate(128, isr128, 0x08, 0xEE);
 
+    /* Hardware Interrupts (IRQs 0–15 remapped to vectors 32–47) */
+    idt_set_gate(32, irq0,  0x08, 0x8E);
+    idt_set_gate(33, irq1,  0x08, 0x8E);
+    idt_set_gate(34, irq2,  0x08, 0x8E);
+    idt_set_gate(35, irq3,  0x08, 0x8E);
+    idt_set_gate(36, irq4,  0x08, 0x8E);
+    idt_set_gate(37, irq5,  0x08, 0x8E);
+    idt_set_gate(38, irq6,  0x08, 0x8E);
+    idt_set_gate(39, irq7,  0x08, 0x8E);
+    idt_set_gate(40, irq8,  0x08, 0x8E);
+    idt_set_gate(41, irq9,  0x08, 0x8E);
+    idt_set_gate(42, irq10, 0x08, 0x8E);
+    idt_set_gate(43, irq11, 0x08, 0x8E);
+    idt_set_gate(44, irq12, 0x08, 0x8E);
+    idt_set_gate(45, irq13, 0x08, 0x8E);
+    idt_set_gate(46, irq14, 0x08, 0x8E);
+    idt_set_gate(47, irq15, 0x08, 0x8E);
+
     idt_flush((uint32_t)&idtp);
 }
 
@@ -138,6 +157,24 @@ void isr_dispatch(struct registers *regs) {
     uint32_t ec = regs->err_code;
     for (int i = 9; i >= 2; i--) { hbuf[i] = hex[ec & 0xF]; ec >>= 4; }
     terminal_writestring(hbuf);
-    terminal_writestring("\nSystem Halted.\n");
+    terminal_writestring("System Halted.\n");
     for (;;) { asm volatile("hlt"); }
+}
+
+/*
+ * irq_dispatch - Common C handler for hardware interrupts.
+ * Acknowledges the PIC and calls the registered C handler.
+ */
+void irq_dispatch(struct registers *regs) {
+    /* If the interrupt came from the slave PIC (IRQ 8-15, vectors 40-47),
+     * send EOI to the slave PIC as well. */
+    if (regs->int_no >= 40) {
+        outb(0xA0, 0x20);
+    }
+    /* Send EOI to master PIC */
+    outb(0x20, 0x20);
+
+    if (handlers[regs->int_no]) {
+        handlers[regs->int_no](regs);
+    }
 }

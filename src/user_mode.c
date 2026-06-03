@@ -102,9 +102,11 @@ static void user_program(void) {
  * 2. Call enter_user_mode (in user_switch.s) which constructs an iret
  *    frame and drops to Ring 3, jumping to user_program.
  * ----------------------------------------------------------------------- */
+#include "task.h"
+
 void run_user_demo(void) {
     /* Stack grows downward: pass the *top* of the stack array */
-    uint32_t kstack_top = (uint32_t)kernel_stack + STACK_SIZE;
+    uint32_t kstack_top = get_current_task() ? get_current_task()->kstack : ((uint32_t)kernel_stack + STACK_SIZE);
     uint32_t ustack_top = (uint32_t)user_stack   + STACK_SIZE;
 
     tss_set_kernel_stack(kstack_top);

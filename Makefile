@@ -16,6 +16,9 @@ OBJS = src/boot.o \
        src/user_mode.o \
        src/pmm.o \
        src/vmm.o \
+       src/timer.o \
+       src/task.o \
+       src/switch.o \
        src/kernel.o
 
 all: myos.iso

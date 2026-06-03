@@ -8,6 +8,8 @@
 #include "pmm.h"
 #include "vmm.h"
 #include "multiboot.h"
+#include "task.h"
+#include "timer.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -121,6 +123,10 @@ void terminal_writedec(uint32_t n) {
     terminal_putchar(buf[j]);
   }
 }
+
+void task_a(void);
+void task_b(void);
+void task_user(void);
 
 void kernel_main(uint32_t magic, uint32_t mbi_addr) {
   /* Initialize terminal interface */
@@ -283,12 +289,54 @@ void kernel_main(uint32_t magic, uint32_t mbi_addr) {
   }
   vmm_map_page(phys_sec, (void *)0xD0000000, VMM_FLAG_PRESENT | VMM_FLAG_WRITE);
 
-  /* 10. Transition to Ring 3 User Mode */
-  terminal_writestring("[Kernel] Transitioning to Ring 3 User Mode...\n\n");
-  run_user_demo();
+  /* 10. Initialize Scheduler */
+  terminal_writestring("[Kernel] Initializing Scheduler...\n");
+  scheduler_init();
 
-  /* Should never reach here */
+  /* 11. Create Demo Tasks */
+  terminal_writestring("[Kernel] Creating Tasks A, B, and User...\n");
+  task_create(task_a, 0, false);
+  task_create(task_b, 0, false);
+  task_create(task_user, 0, false);
+
+  /* 12. Initialize PIT Timer (Preemptive Scheduling, 100Hz) */
+  terminal_writestring("[Kernel] Enabling Timer Interrupts...\n");
+  timer_init(100);
+
+  /* Enable interrupts globally */
+  asm volatile("sti");
+
+  /* 13. Idle loop for the boot thread */
+  terminal_writestring("[Kernel] Boot thread entering idle loop.\n\n");
   for (;;) {
     asm volatile("hlt");
   }
+}
+
+/*
+ * Demo Tasks for Preemptive Multitasking
+ */
+void task_a(void) {
+    for (int count = 0; count < 5; count++) {
+        terminal_writestring("[Task A] Running loop ");
+        terminal_writedec(count);
+        terminal_writestring("\n");
+        for (volatile int i = 0; i < 20000000; i++) {} // Busy delay to allow preemption
+    }
+    terminal_writestring("[Task A] Finished.\n");
+}
+
+void task_b(void) {
+    for (int count = 0; count < 5; count++) {
+        terminal_writestring("[Task B] Running loop ");
+        terminal_writedec(count);
+        terminal_writestring("\n");
+        for (volatile int i = 0; i < 20000000; i++) {} // Busy delay to allow preemption
+    }
+    terminal_writestring("[Task B] Finished.\n");
+}
+
+void task_user(void) {
+    terminal_writestring("[Task User] Transitioning to Ring 3...\n");
+    run_user_demo();
 }

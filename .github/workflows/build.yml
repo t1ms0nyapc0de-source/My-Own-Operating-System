@@ -1,0 +1,32 @@
+name: Build and Verify Kernel
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build and Load Docker Image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: ./Dockerfile
+        tags: my-own-kernel-builder:latest
+        load: true
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Compile Kernel
+      run: |
+        docker run --rm -v ${{ github.workspace }}:/root/kernel my-own-kernel-builder:latest make all
