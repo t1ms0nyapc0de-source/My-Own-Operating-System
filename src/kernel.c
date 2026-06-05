@@ -10,6 +10,9 @@
 #include "multiboot.h"
 #include "task.h"
 #include "timer.h"
+#include "vfs.h"
+#include "tar.h"
+#include "elf.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -126,7 +129,6 @@ void terminal_writedec(uint32_t n) {
 
 void task_a(void);
 void task_b(void);
-void task_user(void);
 
 void kernel_main(uint32_t magic, uint32_t mbi_addr) {
   /* Initialize terminal interface */
@@ -289,24 +291,59 @@ void kernel_main(uint32_t magic, uint32_t mbi_addr) {
   }
   vmm_map_page(phys_sec, (void *)0xD0000000, VMM_FLAG_PRESENT | VMM_FLAG_WRITE);
 
-  /* 10. Initialize Scheduler */
+  /* 10. Initialize VFS and RAM Disk (TAR filesystem) */
+  terminal_writestring("[Kernel] Initializing Virtual File System & RAM Disk...\n");
+  uint32_t initrd_start = 0;
+  uint32_t initrd_end = 0;
+  multiboot_info_t *mbi = (multiboot_info_t *)mbi_addr;
+  if (mbi->flags & 0x00000008) { // MULTIBOOT_INFO_MODS
+      if (mbi->mods_count > 0) {
+          struct multiboot_mod_list {
+              uint32_t mod_start;
+              uint32_t mod_end;
+              uint32_t cmdline;
+              uint32_t pad;
+          } __attribute__((packed)) *mods = (struct multiboot_mod_list *)mbi->mods_addr;
+          initrd_start = mods[0].mod_start;
+          initrd_end = mods[0].mod_end;
+      }
+  }
+
+  if (initrd_start != 0 && initrd_end > initrd_start) {
+      tar_init(initrd_start, initrd_end - initrd_start);
+  } else {
+      terminal_writestring("[Kernel] Warning: No RAM disk module found in Multiboot info!\n");
+  }
+
+  /* 11. Initialize Scheduler */
   terminal_writestring("[Kernel] Initializing Scheduler...\n");
   scheduler_init();
 
-  /* 11. Create Demo Tasks */
-  terminal_writestring("[Kernel] Creating Tasks A, B, and User...\n");
+  /* 12. Create Demo Tasks */
+  terminal_writestring("[Kernel] Creating Tasks A and B...\n");
   task_create(task_a, 0, false);
   task_create(task_b, 0, false);
-  task_create(task_user, 0, false);
 
-  /* 12. Initialize PIT Timer (Preemptive Scheduling, 100Hz) */
+  /* 13. Load and Create User ELF Task */
+  if (initrd_start != 0) {
+      uint32_t elf_entry = 0;
+      uint32_t *elf_pd = NULL;
+      if (elf_load("/hello", &elf_entry, &elf_pd) == 0) {
+          terminal_writestring("[Kernel] Spawning user ELF task '/hello'...\n");
+          task_create((void (*)(void))elf_entry, (uint32_t)elf_pd, true);
+      } else {
+          terminal_writestring("[Kernel] Error: Failed to load user ELF task '/hello'\n");
+      }
+  }
+
+  /* 14. Initialize PIT Timer (Preemptive Scheduling, 100Hz) */
   terminal_writestring("[Kernel] Enabling Timer Interrupts...\n");
   timer_init(100);
 
   /* Enable interrupts globally */
   asm volatile("sti");
 
-  /* 13. Idle loop for the boot thread */
+  /* 15. Idle loop for the boot thread */
   terminal_writestring("[Kernel] Boot thread entering idle loop.\n\n");
   for (;;) {
     asm volatile("hlt");
@@ -334,9 +371,4 @@ void task_b(void) {
         for (volatile int i = 0; i < 20000000; i++) {} // Busy delay to allow preemption
     }
     terminal_writestring("[Task B] Finished.\n");
-}
-
-void task_user(void) {
-    terminal_writestring("[Task User] Transitioning to Ring 3...\n");
-    run_user_demo();
 }

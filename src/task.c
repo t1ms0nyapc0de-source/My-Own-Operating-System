@@ -1,5 +1,6 @@
 #include "task.h"
 #include "pmm.h"
+#include "vmm.h"
 #include "string.h"
 
 #define MAX_TASKS 32
@@ -48,9 +49,26 @@ void scheduler_init(void) {
     asm volatile("sti");
 }
 
-task_t *task_create(void (*entry)(void), uint32_t page_dir, bool is_user) {
-    (void)is_user; // Unused for now, all tasks run as kernel threads initially
+void task_user_bootstrap(void) {
+    task_t *curr = get_current_task();
     
+    // Allocate user stack dynamically in the active page directory (flags = Present | Write | User)
+    void *ustack_phys = pmm_alloc_block();
+    uint32_t ustack_virt = 0xBFFF0000;
+    vmm_map_page(ustack_phys, (void *)ustack_virt, VMM_FLAG_PRESENT | VMM_FLAG_WRITE | VMM_FLAG_USER);
+    
+    uint32_t ustack_top = ustack_virt + 4096;
+    
+    // Set the TSS kernel stack to the top of this task's kernel stack
+    extern void tss_set_kernel_stack(uint32_t);
+    tss_set_kernel_stack(curr->kstack);
+    
+    // Drop privilege to Ring 3 and jump to the user entry point (saved in eip)
+    extern void enter_user_mode(uint32_t entry, uint32_t user_esp);
+    enter_user_mode(curr->eip, ustack_top);
+}
+
+task_t *task_create(void (*entry)(void), uint32_t page_dir, bool is_user) {
     asm volatile("cli");
 
     // Find free slot
@@ -82,10 +100,15 @@ task_t *task_create(void (*entry)(void), uint32_t page_dir, bool is_user) {
     new_task->state = TASK_STATE_READY;
     new_task->page_directory = page_dir ? page_dir : read_cr3();
     new_task->kstack = (uint32_t)stack + PMM_BLOCK_SIZE;
+    new_task->eip = (uint32_t)entry; // Save the entry point
 
     // Set up the initial stack contents for switch_task to pop
     uint32_t *stack_ptr = (uint32_t *)new_task->kstack;
-    stack_ptr[-1] = (uint32_t)entry;                     // Argument to task_kernel_bootstrap
+    
+    // If it is a user-mode process, run the user bootstrap wrapper; otherwise run directly
+    void (*kernel_entry)(void) = is_user ? task_user_bootstrap : entry;
+
+    stack_ptr[-1] = (uint32_t)kernel_entry;              // Argument to task_kernel_bootstrap
     stack_ptr[-2] = 0;                                    // Dummy return address
     stack_ptr[-3] = (uint32_t)task_kernel_bootstrap;         // Address to jump to via ret
     stack_ptr[-4] = 0;                                    // EBP

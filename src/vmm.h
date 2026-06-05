@@ -14,6 +14,8 @@
 #define VMM_FLAG_ACCESSED 0x020  /* Set by CPU when page is read or written */
 #define VMM_FLAG_DIRTY    0x040  /* Set by CPU when page is written to (PTE only) */
 
+extern uint32_t *current_page_directory;
+
 /*
  * vmm_init - Initialize the Virtual Memory Manager.
  * Installs the Page Fault handler, creates a Page Directory,

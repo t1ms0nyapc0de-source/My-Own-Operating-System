@@ -130,6 +130,21 @@ void pmm_init(uint32_t mbi_addr) {
     uint32_t kernel_start = (uint32_t)&_kernel_start;
     uint32_t bitmap_end = (uint32_t)pmm_bitmap + bitmap_size;
     pmm_reserve_region(kernel_start, bitmap_end - kernel_start);
+
+    /* Reserve Multiboot modules (RAM disk / initrd) to prevent memory allocation overlaps */
+    if (mbi->flags & 0x00000008) {
+        struct multiboot_mod_list {
+            uint32_t mod_start;
+            uint32_t mod_end;
+            uint32_t cmdline;
+            uint32_t pad;
+        } __attribute__((packed)) *mods = (struct multiboot_mod_list *)mbi->mods_addr;
+
+        for (uint32_t i = 0; i < mbi->mods_count; i++) {
+            uint32_t size = mods[i].mod_end - mods[i].mod_start;
+            pmm_reserve_region(mods[i].mod_start, size);
+        }
+    }
 }
 
 /*

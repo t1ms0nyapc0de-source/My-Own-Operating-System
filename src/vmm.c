@@ -11,7 +11,7 @@ extern void terminal_writedec(uint32_t n);
 /* 
  * Active Page Directory (must be 4KB aligned)
  */
-static uint32_t *current_page_directory = NULL;
+uint32_t *current_page_directory = NULL;
 
 /* 
  * Assembly control register manipulation and TLB invalidation functions

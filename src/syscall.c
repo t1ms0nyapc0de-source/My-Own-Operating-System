@@ -1,5 +1,6 @@
 #include "syscall.h"
 #include "idt.h"
+#include "task.h"
 #include <stdint.h>
 
 extern void terminal_putchar(char c);
@@ -40,11 +41,10 @@ static void sys_exit(struct registers *regs) {
     terminal_writestring("\n[Kernel] Process exited with status ");
     char c = '0' + (char)(regs->ebx % 10);
     terminal_putchar(c);
-    terminal_writestring(".\n[Kernel] CPU halted.\n");
+    terminal_writestring(".\n");
 
-    /* Permanently halt — no more processes to run yet */
-    asm volatile("cli");
-    for (;;) { asm volatile("hlt"); }
+    /* Terminate the current task and run the next one */
+    task_exit();
 }
 
 /* -----------------------------------------------------------------------

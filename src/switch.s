@@ -3,6 +3,7 @@ section .text
 
 global switch_task
 extern tss_set_kernel_stack
+extern current_page_directory
 
 switch_task:
     ; Save caller-preserved registers onto the stack of the current task
@@ -37,6 +38,7 @@ switch_task:
     cmp ecx, ebx
     je .no_paging_switch
     mov cr3, ecx
+    mov [current_page_directory], ecx ; Update VMM's tracking pointer!
 .no_paging_switch:
 
     ; Update the TSS kernel stack pointer for user-mode switch context
