@@ -10,6 +10,10 @@ static struct dirent dirent_buf;
 
 extern void terminal_writestring(const char *);
 extern void terminal_writedec(uint32_t);
+extern void terminal_writehex(uint32_t);
+
+extern int strcmp(const char *s1, const char *s2);
+extern int strncmp(const char *s1, const char *s2, size_t n);
 
 static uint32_t get_octal(const char *in, int len) {
     uint32_t out = 0;
@@ -30,7 +34,7 @@ static uint32_t tar_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_
     if (offset + size > node->length) {
         size = node->length - offset;
     }
-    memcpy(buffer, (const void *)(node->impl + offset), size);
+    memcpy(buffer, (const void *)(uintptr_t)(node->impl + offset), size);
     return size;
 }
 
@@ -123,7 +127,7 @@ fs_node_t *tar_init(uint32_t address, uint32_t size) {
     terminal_writestring("...\n");
 
     while (ptr < address + size) {
-        struct tar_header *header = (struct tar_header *)ptr;
+        struct tar_header *header = (struct tar_header *)(uintptr_t)ptr;
 
         if (header->name[0] == '\0') {
             break; // EOF

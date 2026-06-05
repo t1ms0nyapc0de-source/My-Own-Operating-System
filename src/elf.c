@@ -78,14 +78,14 @@ int elf_load(const char *path, uint32_t *out_entry, uint32_t **out_pd) {
                 }
 
                 // Map virtual page in the active process directory (proc_pd)
-                vmm_map_page(phys, (void *)vaddr, VMM_FLAG_PRESENT | VMM_FLAG_WRITE | VMM_FLAG_USER);
+                vmm_map_page(phys, (void *)(uintptr_t)vaddr, VMM_FLAG_PRESENT | VMM_FLAG_WRITE | VMM_FLAG_USER);
                 
                 // Zero out the page to clear any previous contents (essential for BSS and alignment)
-                memset((void *)vaddr, 0, PMM_BLOCK_SIZE);
+                memset((void *)(uintptr_t)vaddr, 0, PMM_BLOCK_SIZE);
             }
 
             // Read the segment content from file directly into the process's mapped virtual address space
-            read_fs(file, phdr.p_offset, phdr.p_filesz, (uint8_t *)start_vaddr);
+            read_fs(file, phdr.p_offset, phdr.p_filesz, (uint8_t *)(uintptr_t)start_vaddr);
 
             // Restore the old page directory
             current_page_directory = old_pd;
