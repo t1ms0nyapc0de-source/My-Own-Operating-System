@@ -43,7 +43,7 @@ void scheduler_init(void) {
   task_list = boot_task;
   current_task = boot_task;
 
-  asm volatile("sti");
+  
 }
 
 void task_user_bootstrap(void) {
@@ -87,7 +87,7 @@ task_t *task_create(void (*entry)(void), uint32_t page_dir, bool is_user) {
   }
 
   if (!new_task) {
-    asm volatile("sti");
+    
     return NULL; /* Task table full */
   }
 
@@ -97,11 +97,12 @@ task_t *task_create(void (*entry)(void), uint32_t page_dir, bool is_user) {
     /* Do NOT touch new_task->pid here — if the slot was a zombie its pid
      * is already set; zeroing it would make it look unused without cleaning up.
      * Just leave the slot as-is and return NULL. */
-    asm volatile("sti");
+    
     return NULL;
   }
 
   memset(stack, 0, PMM_BLOCK_SIZE);
+  vmm_map_page(stack, stack, VMM_FLAG_PRESENT | VMM_FLAG_WRITE);
 
   new_task->pid = next_pid++;
   new_task->state = TASK_STATE_READY;
@@ -113,16 +114,24 @@ task_t *task_create(void (*entry)(void), uint32_t page_dir, bool is_user) {
 
   void (*kernel_entry)(void) = is_user ? task_user_bootstrap : entry;
 
-  stack_ptr[-1] = (uint32_t)kernel_entry;
-  stack_ptr[-2] = 0;
-  stack_ptr[-3] = (uint32_t)task_kernel_bootstrap;
-  stack_ptr[-4] = 0; /* EBP */
-  stack_ptr[-5] = 0; /* EBX */
-  stack_ptr[-6] = 0; /* ESI */
-  stack_ptr[-7] = 0; /* EDI */
+  /* Build the initial stack frame that switch_task will restore.
+   *
+   * switch_task pops: edi, esi, ebx, ebp, then does ret.
+   * ret pops the return address → jumps to task_kernel_bootstrap.
+   * task_kernel_bootstrap is a cdecl function expecting one argument.
+   * After the ret, the stack must look like a normal cdecl call:
+   *   [esp+0] = return address (we use task_exit as the sentinel)
+   *   [esp+4] = first argument (kernel_entry)
+   */
+  stack_ptr[-1] = (uint32_t)kernel_entry;       /* arg0 to task_kernel_bootstrap */
+  stack_ptr[-2] = (uint32_t)task_exit;          /* return address (sentinel) */
+  stack_ptr[-3] = (uint32_t)task_kernel_bootstrap; /* ret target from switch_task */
+  stack_ptr[-4] = 0;                            /* EBP */
+  stack_ptr[-5] = 0;                            /* EBX */
+  stack_ptr[-6] = 0;                            /* ESI */
+  stack_ptr[-7] = 0;                            /* EDI */
 
   new_task->esp = (uint32_t)&stack_ptr[-7];
-
   /* Append to task list */
   task_t *curr = task_list;
   if (!curr) {
@@ -135,7 +144,7 @@ task_t *task_create(void (*entry)(void), uint32_t page_dir, bool is_user) {
   }
   new_task->next = NULL;
 
-  asm volatile("sti");
+  
   return new_task;
 }
 

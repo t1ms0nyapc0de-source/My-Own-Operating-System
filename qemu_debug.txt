@@ -1,0 +1,1 @@
+C:\Program Files\qemu\qemu-system-i386.exe: Yap\My-Own-Operating-System\qemu.log: Could not open 'Yap\My-Own-Operating-System\qemu.log': The system cannot find the path specified.

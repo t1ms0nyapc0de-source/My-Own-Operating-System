@@ -112,8 +112,8 @@ void page_fault_handler(struct registers *regs) {
      * Check if the fault is a non-present page within our demand-paging test zone.
      * If so, allocate a physical block, map it, and return to re-execute the instruction!
      */
-    if (faulting_address >= 0xC0000000 && faulting_address < 0xC0001000) {
-        terminal_writestring("[VMM] Caught Page Fault (Demand Paging Zone) at: ");
+    if (!present && faulting_address >= 0x1000 && !(user == 0 && faulting_address >= 0xC0000000)) {
+        terminal_writestring("[VMM] Caught Page Fault (Demand Paging) at: ");
         terminal_writehex(faulting_address);
         terminal_writestring("\n  -> Status: ");
         if (!present) terminal_writestring("Non-present | ");

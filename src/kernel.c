@@ -74,21 +74,33 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y) {
 }
 
 void terminal_putchar(char c) {
-  if (c == '\n') {
+   if (c == '\n') {
     terminal_column = 0;
-    if (++terminal_row == VGA_HEIGHT) {
-      terminal_row = 0;
+    terminal_row++;
+  } else {
+    terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
+    if (++terminal_column == VGA_WIDTH) {
+      terminal_column = 0;
+      terminal_row++;
     }
-    return;
   }
 
-  terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
-  if (++terminal_column == VGA_WIDTH) {
-    terminal_column = 0;
-    if (++terminal_row == VGA_HEIGHT)
-      terminal_row = 0;
+  /* Scroll up by one line when we hit the bottom */
+  if (terminal_row >= VGA_HEIGHT) {
+    /* Move every row up by one */
+    for (size_t y = 1; y < VGA_HEIGHT; y++) {
+      for (size_t x = 0; x < VGA_WIDTH; x++) {
+        terminal_buffer[(y-1) * VGA_WIDTH + x] = terminal_buffer[y * VGA_WIDTH + x];
+      }
+    }
+    /* Clear the last row */
+    for (size_t x = 0; x < VGA_WIDTH; x++) {
+      terminal_buffer[(VGA_HEIGHT-1) * VGA_WIDTH + x] = vga_entry(' ', terminal_color);
+    }
+    terminal_row = VGA_HEIGHT - 1;
   }
 }
+
 
 void terminal_writestring(const char *data) {
   size_t i = 0;
@@ -229,6 +241,7 @@ void kernel_main(uint32_t magic, uint32_t mbi_addr) {
   /* 7. Initialize Virtual Memory Manager (VMM) */
   terminal_writestring("[Kernel] Initializing Virtual Memory Manager (VMM)...\n");
   vmm_init();
+  asm volatile("cli"); /* Keep interrupts off until scheduler is fully ready */
 
   /* 8. Run VMM Diagnostic Test Suite */
   terminal_writestring("[Kernel] Running VMM diagnostic tests...\n");
@@ -267,7 +280,7 @@ void kernel_main(uint32_t magic, uint32_t mbi_addr) {
    * This write will trigger a Page Fault. The handler will intercept it,
    * map it dynamically, and return here to re-execute the write!
    */
-  volatile uint32_t *demand_ptr = (volatile uint32_t *)0xC0000000;
+  volatile uint32_t *demand_ptr = (volatile uint32_t *)0x40000000;
   *demand_ptr = 0x12345678;
 
   /* Verify the written value */
@@ -278,7 +291,7 @@ void kernel_main(uint32_t magic, uint32_t mbi_addr) {
   terminal_writestring("  -> Test B Passed: Demand paging dynamically resolved non-present access.\n");
 
   /* Clean up Test B */
-  vmm_unmap_page((void *)0xC0000000);
+  vmm_unmap_page((void *)0x40000000);
 
   terminal_writestring("[Kernel] VMM diagnostic tests passed successfully!\n\n");
 

@@ -16,6 +16,7 @@ extern void tss_flush(void);
 static struct gdt_entry gdt[6];
 static struct gdt_ptr   gdtp;
 static struct tss_entry tss;
+static uint8_t tss_stack[4096];
 
 /*
  * gdt_set_entry - Encode and write one GDT descriptor.
@@ -86,9 +87,8 @@ void gdt_init(void) {
     gdt_set_entry(3, 0, 0xFFFFFFFF, 0xFA, 0xCF); /* User   Code: P=1 DPL=3 E=1 RW=1 */
     gdt_set_entry(4, 0, 0xFFFFFFFF, 0xF2, 0xCF); /* User   Data: P=1 DPL=3 E=0 RW=1 */
 
-    /* Install TSS: kernel stack segment = 0x10, stack ptr set later */
-    tss_write(5, 0x10, 0);
-
+    /* Use a static 4KB boot stack for the TSS until tasks take over */
+    tss_write(5, 0x10, (uint32_t)(tss_stack + sizeof(tss_stack)));
     gdt_flush((uint32_t)&gdtp); /* lgdt + far jump to reload CS */
     tss_flush();                /* ltr  to load Task Register   */
 }

@@ -43,3 +43,14 @@ tss_flush:
     mov ax, 0x2B          ; TSS selector: 0x28 | RPL 3
     ltr ax                ; Load Task Register
     ret
+
+; -----------------------------------------------------------------------
+; idt_flush(uint32_t idt_ptr_addr)
+;
+; Loads the IDT pointer into the CPU using LIDT.
+; -----------------------------------------------------------------------
+global idt_flush
+idt_flush:
+    mov eax, [esp+4]
+    lidt [eax]
+    ret

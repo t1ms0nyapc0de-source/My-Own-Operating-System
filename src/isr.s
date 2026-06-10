@@ -10,16 +10,6 @@
 section .text
 
 extern isr_dispatch     ; C-level dispatcher in idt.c
-extern idt_flush        ; C-level call to lidt
-
-; -----------------------------------------------------------------------
-; idt_flush(uint32_t idt_ptr_addr)
-; -----------------------------------------------------------------------
-global idt_flush
-idt_flush:
-    mov eax, [esp+4]
-    lidt [eax]
-    ret
 
 ; -----------------------------------------------------------------------
 ; isr_common_stub
