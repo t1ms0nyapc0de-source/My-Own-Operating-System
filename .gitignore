@@ -1,0 +1,17 @@
+# Build outputs
+myos.bin
+myos.iso
+initrd.tar
+
+# Object files
+*.o
+src/*.o
+
+# Directories
+isodir/
+initrd/
+
+# Debug and test outputs
+vga.bin
+screen.ppm
+screen.bmp
