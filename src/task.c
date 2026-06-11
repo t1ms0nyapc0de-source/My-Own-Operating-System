@@ -49,6 +49,17 @@ void scheduler_init(void) {
 void task_user_bootstrap(void) {
   task_t *curr = get_current_task();
 
+  /* Switch to the process page directory BEFORE mapping the user stack
+   * so that vmm_map_page writes the PTE into the process's own page
+   * directory, not the kernel's. Without this the stack mapping is
+   * invisible once enter_user_mode loads proc_pd into CR3. */
+  extern uint32_t *current_page_directory;
+  uint32_t kernel_pd_phys = (uint32_t)current_page_directory;
+  if (curr->page_directory && curr->page_directory != kernel_pd_phys) {
+    current_page_directory = (uint32_t *)curr->page_directory;
+    asm volatile("mov %0, %%cr3" : : "r"(curr->page_directory) : "memory");
+  }
+
   void *ustack_phys = pmm_alloc_block();
   uint32_t ustack_virt = 0xBFFF0000;
   vmm_map_page(ustack_phys, (void *)ustack_virt,

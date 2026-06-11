@@ -21,6 +21,7 @@ struct tar_header {
     char devmajor[8];
     char devminor[8];
     char prefix[155];
+    char pad[12];       /* padding to reach exactly 512 bytes */
 } __attribute__((packed));
 
 fs_node_t *tar_init(uint32_t address, uint32_t size);

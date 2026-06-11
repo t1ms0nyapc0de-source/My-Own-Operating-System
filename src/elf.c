@@ -125,10 +125,12 @@ int elf_load(const char *path, uint32_t *out_entry, uint32_t **out_pd) {
         memset((void *)(uintptr_t)vaddr, 0, PMM_BLOCK_SIZE);
       }
 
+      /* Read segment data while proc_pd is still active so the
+       * write lands in the pages we just mapped above. */
       read_fs(file, phdr.p_offset, phdr.p_filesz,
               (uint8_t *)(uintptr_t)start_vaddr);
 
-      /* Restore kernel page directory */
+      /* Restore kernel page directory AFTER the read */
       current_page_directory = old_pd;
       asm volatile("mov %0, %%cr3" : : "r"(old_pd) : "memory");
       asm volatile("sti"); /* Re-enable interrupts after CR3 is restored */

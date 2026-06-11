@@ -240,8 +240,35 @@ void kernel_main(uint32_t magic, uint32_t mbi_addr) {
 
   /* 7. Initialize Virtual Memory Manager (VMM) */
   terminal_writestring("[Kernel] Initializing Virtual Memory Manager (VMM)...\n");
+
+  /* --- PRE-VMM PROBE: check initrd byte before paging enabled --- */
+  {
+    multiboot_info_t *mbi_probe = (multiboot_info_t *)mbi_addr;
+    if ((mbi_probe->flags & 0x00000008) && mbi_probe->mods_count > 0) {
+      struct { uint32_t s, e, c, p; } *m = (void *)mbi_probe->mods_addr;
+      terminal_writestring("[DBG] PRE-VMM  initrd[0]=0x");
+      terminal_writehex(*((uint8_t *)m->s));
+      terminal_writestring(" at addr=0x");
+      terminal_writehex(m->s);
+      terminal_writestring(" size=");
+      terminal_writedec(m->e - m->s);
+      terminal_writestring("\n");
+    }
+  }
+
   vmm_init();
   asm volatile("cli"); /* Keep interrupts off until scheduler is fully ready */
+
+  /* --- POST-VMM PROBE: check initrd byte after paging enabled --- */
+  {
+    multiboot_info_t *mbi_probe = (multiboot_info_t *)mbi_addr;
+    if ((mbi_probe->flags & 0x00000008) && mbi_probe->mods_count > 0) {
+      struct { uint32_t s, e, c, p; } *m = (void *)mbi_probe->mods_addr;
+      terminal_writestring("[DBG] POST-VMM initrd[0]=0x");
+      terminal_writehex(*((uint8_t *)m->s));
+      terminal_writestring("\n");
+    }
+  }
 
   /* 8. Run VMM Diagnostic Test Suite */
   terminal_writestring("[Kernel] Running VMM diagnostic tests...\n");
@@ -323,6 +350,13 @@ void kernel_main(uint32_t magic, uint32_t mbi_addr) {
   }
 
   if (initrd_start != 0 && initrd_end > initrd_start) {
+      terminal_writestring("[DBG] tar_init addr=0x");
+      terminal_writehex(initrd_start);
+      terminal_writestring(" size=");
+      terminal_writedec(initrd_end - initrd_start);
+      terminal_writestring(" byte[0]=0x");
+      terminal_writehex(*((uint8_t *)initrd_start));
+      terminal_writestring("\n");
       tar_init(initrd_start, initrd_end - initrd_start);
   } else {
       terminal_writestring("[Kernel] Warning: No RAM disk module found in Multiboot info!\n");

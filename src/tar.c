@@ -129,6 +129,13 @@ fs_node_t *tar_init(uint32_t address, uint32_t size) {
     while (ptr < address + size) {
         struct tar_header *header = (struct tar_header *)(uintptr_t)ptr;
 
+        /* Debug: print first byte and magic to diagnose TAR parsing */
+        terminal_writestring("  [TAR DBG] name[0]=0x");
+        terminal_writehex((uint8_t)header->name[0]);
+        terminal_writestring(" magic=");
+        terminal_writestring(header->magic);
+        terminal_writestring("\n");
+
         if (header->name[0] == '\0') {
             break; // EOF
         }
