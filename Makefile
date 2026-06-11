@@ -37,7 +37,7 @@ all: myos.iso
 myos.bin: $(OBJS)
 	$(LD) -T src/linker.ld -o myos.bin $(LDFLAGS) -lgcc $(OBJS)
 
-myos.iso: myos.bin initrd.tar
+myos.iso: myos.bin initrd.tar grub.cfg
 	mkdir -p isodir/boot/grub
 	cp myos.bin isodir/boot/myos.bin
 	cp initrd.tar isodir/boot/initrd.tar

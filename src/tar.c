@@ -144,7 +144,18 @@ fs_node_t *tar_init(uint32_t address, uint32_t size) {
         if (tar_file_count < MAX_TAR_FILES) {
             fs_node_t *node = &tar_nodes[tar_file_count++];
             memset(node, 0, sizeof(fs_node_t));
-            strcpy(node->name, header->name);
+
+            /*
+             * Modern GNU tar stores entries with a leading "./" prefix
+             * (e.g., "./hello" instead of "hello"). Strip it so that
+             * VFS path lookups for "/hello" always find the entry.
+             */
+            const char *raw_name = header->name;
+            if (raw_name[0] == '.' && raw_name[1] == '/') {
+                raw_name += 2; /* skip leading "./" */
+            }
+            strcpy(node->name, raw_name);
+
             node->length = file_size;
             node->impl = ptr + 512;
             node->read = tar_read;
